@@ -1,0 +1,152 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lti-provider-mock"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Mark Hall", email = "mark.hall@work.room3b.eu" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "fastapi",
+  "itsdangerous",
+  "jwcrypto",
+  "pydantic",
+  "pydantic-settings",
+  "python-multipart",
+]
+
+[project.urls]
+Documentation = "https://github.com/Mark Hall/lti-provider-mock#readme"
+Issues = "https://github.com/Mark Hall/lti-provider-mock/issues"
+Source = "https://github.com/Mark Hall/lti-provider-mock"
+
+[tool.hatch.version]
+path = "lti_provider_mock/__about__.py"
+
+[tool.hatch.envs.default]
+extra-dependencies = [
+  "ruff==0.15.20",
+  "uvicorn",
+]
+
+[tool.hatch.envs.default.scripts]
+server = "uvicorn --port 8484 --reload --reload-dir lti_provider_mock --log-level debug --host=0.0.0.0 lti_provider_mock.server:app"
+
+# Style scripts
+ruff-check = "ruff check {args:.}"
+ruff-format = "ruff format {args:.}"
+ruff-style = ["ruff-format", "ruff-check"]
+style = ["ruff-style"]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:lti_provider_mock tests}"
+
+[tool.coverage.run]
+source_pkgs = ["lti_provider_mock", "tests"]
+branch = true
+parallel = true
+omit = [
+  "lti_provider_mock/__about__.py",
+]
+
+[tool.coverage.paths]
+lti_provider_mock = ["lti_provider_mock", "*/lti-provider-mock/lti_provider_mock"]
+tests = ["tests", "*/lti-provider-mock/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+lint.select = [
+  "A",
+  "ARG",
+  "B",
+  "C",
+  "D",
+  "DTZ",
+  "E",
+  "EM",
+  "F",
+  "FBT",
+  "I",
+  "ICN",
+  "ISC",
+  "N",
+  "PLC",
+  "PLE",
+  "PLR",
+  "PLW",
+  "Q",
+  "RUF",
+  "S",
+  "T",
+  "TID",
+  "UP",
+  "W",
+  "YTT",
+]
+lint.ignore = [
+  # Allow non-abstract empty methods in abstract base classes
+  "B027",
+  # Allow boolean positional values in function calls, like `dict.get(... True)`
+  "FBT003",
+  # Ignore single-line concatenation
+  "ISC001",
+  # Ignore checks for possible passwords
+  "S105",
+  "S106",
+  "S107",
+  # Ignore complexity
+  "C901",
+  "PLR0911",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+  # Docstring settings
+  "D203",
+  "D211",
+  "D213",
+]
+lint.unfixable = [
+  # Don't touch unused imports
+  "F401",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["container_launcher"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use magic values, assertions, and relative imports
+"tests/**/*" = ["ARG001", "PLR2004", "S101", "TID252"]
+"dev/jupyterhub_config.py" = ["F821", "S104"]

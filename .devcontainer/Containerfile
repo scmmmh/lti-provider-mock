@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/devcontainers/python:1-3.13
+
+# Setup the PATH, adding the local node_modules directory
+ENV PATH="$PATH:./node_modules/.bin"
+
+RUN rm /etc/apt/sources.list.d/yarn.list
+
+# Install build essentials
+RUN apt-get update && \
+    apt-get install -y build-essential checkinstall python3-dev
+
+# Uninstall pre-installed formatting and linting tools
+RUN pipx uninstall pydocstyle && \
+    pipx uninstall pycodestyle && \
+    pipx uninstall mypy && \
+    pipx uninstall pylint
+
+# Install hatch
+RUN pipx install hatch && \
+    pipx install pre-commit
+
+# User setup
+USER vscode
+
+WORKDIR /workspaces
