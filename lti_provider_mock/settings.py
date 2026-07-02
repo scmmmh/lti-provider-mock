@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     users: list[User] = []
     courses: list[Course] = []
     lti: LTISettings
+    route_prefix: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

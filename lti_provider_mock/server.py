@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import Cookie, Depends, FastAPI, Form, Header
 from fastapi.exceptions import HTTPException
+from fastapi.requests import Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from itsdangerous import Serializer
 from jwcrypto.jwk import JWK
@@ -41,16 +42,20 @@ def is_authenticated(authorization: Annotated[str | None, Header()] = None) -> s
     return None
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get(f"{settings.route_prefix}/", response_class=HTMLResponse)
 def landing(
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],  # noqa: ARG001
     lti_provider_mock_user: Annotated[str | None, Cookie()] = None,
 ):
     """Show the landing page."""
     if lti_provider_mock_user is None:
-        action = """<a href="/login">Sign in</a>"""
+        action = f"""<a href="{request.url_for("login_form")}">Sign in</a>"""
     else:
-        action = """<a href="/courses">Select course</a> <a href="/logout">Log out</a>"""
+        action = (
+            f"""<a href="{request.url_for("courses_form")}">Select course</a> """
+            """<a href="{request.url_for("logout")}">Log out</a>"""
+        )
     return f"""<!DOCTYPE html>
 <html lang="en">
 
@@ -66,8 +71,8 @@ def landing(
 """
 
 
-@app.get("/login", response_class=HTMLResponse)
-def login_form(auth_user: Annotated[str, Depends(is_authenticated)]):
+@app.get(f"{settings.route_prefix}/login", response_class=HTMLResponse)
+def login_form(request: Request, auth_user: Annotated[str, Depends(is_authenticated)]):
     """Show the login form for selecting the user to log into the LTI tool with."""
     users = "".join(
         [
@@ -84,7 +89,7 @@ def login_form(auth_user: Annotated[str, Depends(is_authenticated)]):
 </head>
 <body>
   <h1>Please select the user to sign in with</h1>
-  <form action="/login" method="post">
+  <form action="{request.url_for("login")}" method="post">
     <label>
       <span>User</span>
       <select name="userid">
@@ -98,8 +103,9 @@ def login_form(auth_user: Annotated[str, Depends(is_authenticated)]):
 """
 
 
-@app.post("/login", response_class=Response)
+@app.post(f"{settings.route_prefix}/login", response_class=Response)
 def login(
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],
     userid: Annotated[str, Form()],
     lti_provider_mock_redirect: Annotated[str | None, Cookie()] = None,
@@ -108,23 +114,24 @@ def login(
     for user in settings.users:
         if user.id == userid and (user.restricted is None or user.restricted == auth_user):
             if lti_provider_mock_redirect is None:
-                response = RedirectResponse("/courses", status_code=303)
+                response = RedirectResponse(request.url_for("courses_form"), status_code=303)
                 response.delete_cookie("lti_provider_mock_redirect")
             else:
                 response = RedirectResponse(cookie_serializer.loads(lti_provider_mock_redirect), status_code=303)
             response.set_cookie("lti_provider_mock_user", cookie_serializer.dumps(user.model_dump()))
             return response
-    return login_form(auth_user)
+    return login_form(request, auth_user)
 
 
-@app.get("/logout", response_class=RedirectResponse)
-def logout(response: Response):
+@app.get(f"{settings.route_prefix}/logout", response_class=Response)
+def logout(request: Request, response: Response):
     """Log the user out and redirect to the landing page."""
+    response = RedirectResponse(request.url_for("landing"))
     response.delete_cookie("lti_provider_mock_user")
-    return "/"
+    return response
 
 
-@app.get("/auth-reset", response_class=RedirectResponse)
+@app.get(f"{settings.route_prefix}/auth-reset", response_class=RedirectResponse)
 def auth_reset(authorization: Annotated[str | None, Header()] = None):
     """Reset the HTTP basic authentication."""
     if authorization is None or authorization == "Basic Og==":
@@ -134,9 +141,14 @@ def auth_reset(authorization: Annotated[str | None, Header()] = None):
 
 
 @app.get("/courses", response_class=HTMLResponse)
-def courses_form(auth_user: Annotated[str, Depends(is_authenticated)]):  # noqa: ARG001
+def courses_form(request: Request, auth_user: Annotated[str, Depends(is_authenticated)]):  # noqa: ARG001
     """Show the course selection form."""
-    courses = "".join([f"""<li><a href="/courses/{course.id}">{course.name}</a></li>""" for course in settings.courses])
+    courses = "".join(
+        [
+            f"""<li><a href="{request.url_for("lti_start_login", cid=course.id)}">{course.name}</a></li>"""
+            for course in settings.courses
+        ]
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 
@@ -155,9 +167,10 @@ def courses_form(auth_user: Annotated[str, Depends(is_authenticated)]):  # noqa:
 """
 
 
-@app.get("/courses/{cid}", response_class=Response)
+@app.get(settings.route_prefix + "/courses/{cid}", response_class=Response)
 def lti_start_login(
     cid: str,
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],  # noqa: ARG001
     lti_provider_mock_user: Annotated[str | None, Cookie()] = None,
 ):
@@ -165,8 +178,10 @@ def lti_start_login(
     if len([course for course in settings.courses if course.id == cid]) == 0:
         raise HTTPException(404)
     if lti_provider_mock_user is None:
-        response = RedirectResponse("/login")
-        response.set_cookie("lti_provider_mock_redirect", cookie_serializer.dumps(f"/courses/{cid}"))
+        response = RedirectResponse(request.url_for("login"))
+        response.set_cookie(
+            "lti_provider_mock_redirect", cookie_serializer.dumps(str(request.url_for("lti_start_login", cid=cid)))
+        )
         return response
     login_hint = token_hex(32)
     response = HTMLResponse(f"""<!DOCTYPE html>
@@ -201,21 +216,23 @@ def lti_start_login(
     return response
 
 
-@app.post("/courses/{cid}", response_class=Response)
+@app.post(settings.route_prefix + "/courses/{cid}", response_class=Response)
 def lti_start_login_post(
-    mid: str,
+    cid: str,
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],
     lti_provider_mock_user: Annotated[str | None, Cookie()] = None,
 ):
     """Handle POST requests to the LTI login start page."""
-    return lti_start_login(mid, auth_user, lti_provider_mock_user=lti_provider_mock_user)
+    return lti_start_login(cid, request, auth_user, lti_provider_mock_user=lti_provider_mock_user)
 
 
-@app.get("/authorize", response_class=Response)
+@app.get(f"{settings.route_prefix}/authorize", response_class=Response)
 def lti_authorize(
     state: str,
     nonce: str,
-    login_hint,
+    login_hint: str,
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],  # noqa: ARG001
     lti_provider_mock_user: Annotated[str | None, Cookie()] = None,
     lti_provider_mock_course: Annotated[str | None, Cookie()] = None,
@@ -223,7 +240,7 @@ def lti_authorize(
 ):
     """Handle the LTI login authorization endpoint."""
     if lti_provider_mock_user is None:
-        return RedirectResponse("/login", status_code=303)
+        return RedirectResponse(request.url_for("login_form"), status_code=303)
     if lti_provider_mock_course is None:
         raise HTTPException(422, {"error": "Unknown course for login"})
     if lti_provider_mock_login_hint is None or cookie_serializer.loads(lti_provider_mock_login_hint) != login_hint:
@@ -296,11 +313,12 @@ def lti_authorize(
     return response
 
 
-@app.post("/authorize", response_class=Response)
+@app.post(f"{settings.route_prefix}/authorize", response_class=Response)
 def lti_authorize_post(
     state: str,
     nonce: str,
-    login_hint,
+    login_hint: str,
+    request: Request,
     auth_user: Annotated[str, Depends(is_authenticated)],
     lti_provider_mock_user: Annotated[str | None, Cookie()] = None,
     lti_provider_mock_course: Annotated[str | None, Cookie()] = None,
@@ -311,6 +329,7 @@ def lti_authorize_post(
         state,
         nonce,
         login_hint,
+        request,
         auth_user,
         lti_provider_mock_user=lti_provider_mock_user,
         lti_provider_mock_course=lti_provider_mock_course,
@@ -318,7 +337,7 @@ def lti_authorize_post(
     )
 
 
-@app.get("/certs")
+@app.get(f"{settings.route_prefix}/jwks")
 def certificates():
     """Show the configured key certificates for signing purposes."""
     return {"keys": [jwt_key.export_public(as_dict=True)]}
