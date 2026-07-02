@@ -176,12 +176,12 @@ def lti_start_login(
   <title>Starting login process</title>
 </head>
 <body>
-  <form id="login-form" action="http://localhost:6543/auth/lti/login" method="post">
-    <input type="hidden" name="iss" value="http://localhost:8484" />
+  <form id="login-form" action="{settings.lti.login_url}" method="post">
+    <input type="hidden" name="iss" value="{settings.lti.iss}" />
     <input
       type="hidden"
       name="target_link_uri"
-      value="http://localhost:6543/auth/lti/launch"
+      value="{settings.lti.launch_url}"
     />
     <input type="hidden" name="lti_message_hint" value="test" />
     <input type="hidden" name="client_id" value="lti-provider-mock" />
@@ -241,7 +241,7 @@ def lti_authorize(
         "nonce": nonce,
         "iat": now,
         "exp": now + 300,
-        "iss": "http://localhost:8484",
+        "iss": settings.lti.iss,
         "aud": "lti-provider-mock",
         "sub": user["id"],
         # Deployment / Target Link Claims

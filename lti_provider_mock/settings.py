@@ -35,7 +35,9 @@ class User(BaseModel):
 class LTISettings(BaseModel):
     """LTI settings."""
 
-    pass
+    iss: str
+    login_url: str
+    launch_url: str
 
 
 class Settings(BaseSettings):
