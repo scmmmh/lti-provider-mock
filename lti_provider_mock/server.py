@@ -54,7 +54,7 @@ def landing(
     else:
         action = (
             f"""<a href="{request.url_for("courses_form")}">Select course</a> """
-            """<a href="{request.url_for("logout")}">Log out</a>"""
+            f"""<a href="{request.url_for("logout")}">Log out</a>"""
         )
     return f"""<!DOCTYPE html>
 <html lang="en">
