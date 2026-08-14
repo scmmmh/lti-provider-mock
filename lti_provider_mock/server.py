@@ -140,7 +140,7 @@ def auth_reset(authorization: Annotated[str | None, Header()] = None):
         raise HTTPException(401, headers={"WWW-Authenticate": "Basic realm='LTI Provider Mock'"})
 
 
-@app.get("/courses", response_class=HTMLResponse)
+@app.get(f"{settings.route_prefix}/courses", response_class=HTMLResponse)
 def courses_form(request: Request, auth_user: Annotated[str, Depends(is_authenticated)]):  # noqa: ARG001
     """Show the course selection form."""
     courses = "".join(
