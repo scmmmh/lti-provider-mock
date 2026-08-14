@@ -263,7 +263,7 @@ def lti_authorize(
         "sub": user["id"],
         # Deployment / Target Link Claims
         "https://purl.imsglobal.org/spec/lti/claim/deployment_id": "1",
-        "https://purl.imsglobal.org/spec/lti/claim/target_link_uri": "http://localhost:6543/auth/lti/launch",
+        "https://purl.imsglobal.org/spec/lti/claim/target_link_uri": settings.lti.launch_url,
         # LTI Version Claims
         "https://purl.imsglobal.org/spec/lti/claim/version": "1.3.0",
         "https://purl.imsglobal.org/spec/lti/claim/message_type": "LtiResourceLinkRequest",
@@ -297,7 +297,7 @@ def lti_authorize(
   <title>Authorize</title>
 </head>
 <body>
-  <form id="launch-form" action="http://localhost:6543/auth/lti/launch" method="post">
+  <form id="launch-form" action="{settings.lti.launch_url}" method="post">
     <input type="hidden" name="id_token" value="{token}"/>
     <input type="hidden" name="state" value="{state}"/>
     <button type="submit">Launch the LTI tool</button>
