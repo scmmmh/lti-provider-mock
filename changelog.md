@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (14.08.2026)
+
+- **Bugfix**: Remove hard-coded URLs
+
 ## 0.2.1 (14.08.2026)
 
 - **Bugfix**: Fixed a bug with the /courses endpoint and prefixes
