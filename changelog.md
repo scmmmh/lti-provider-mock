@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 (14.08.2026)
+
+- **Bugfix**: Ensure course filtering by users works correctly
+
 ## 0.2.2 (14.08.2026)
 
 - **Bugfix**: Remove hard-coded URLs
