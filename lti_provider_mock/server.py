@@ -52,7 +52,9 @@ def landing(
     if lti_provider_mock_user is None:
         action = f"""<a href="{request.url_for("login_form")}">Sign in</a>"""
     else:
+        lti_user = cookie_serializer.loads(lti_provider_mock_user)
         action = (
+            f"""<p>You are logged in as {lti_user["given_name"]} {lti_user["family_name"]}</p>"""
             f"""<a href="{request.url_for("courses_form")}">Select course</a> """
             f"""<a href="{request.url_for("logout")}">Log out</a>"""
         )
@@ -128,6 +130,7 @@ def logout(request: Request, response: Response):
     """Log the user out and redirect to the landing page."""
     response = RedirectResponse(request.url_for("landing"))
     response.delete_cookie("lti_provider_mock_user")
+    response.delete_cookie("lti_provider_mock_redirect")
     return response
 
 
@@ -141,12 +144,18 @@ def auth_reset(authorization: Annotated[str | None, Header()] = None):
 
 
 @app.get(f"{settings.route_prefix}/courses", response_class=HTMLResponse)
-def courses_form(request: Request, auth_user: Annotated[str, Depends(is_authenticated)]):  # noqa: ARG001
+def courses_form(
+    request: Request,
+    auth_user: Annotated[str, Depends(is_authenticated)],  # noqa: ARG001
+    lti_provider_mock_user: Annotated[str | None, Cookie()],
+):
     """Show the course selection form."""
+    lti_user = cookie_serializer.loads(lti_provider_mock_user)
     courses = "".join(
         [
             f"""<li><a href="{request.url_for("lti_start_login", cid=course.id)}">{course.name}</a></li>"""
             for course in settings.courses
+            if lti_user["id"] in course.users or len(course.users) == 0
         ]
     )
     return f"""<!DOCTYPE html>
@@ -157,7 +166,10 @@ def courses_form(request: Request, auth_user: Annotated[str, Depends(is_authenti
 </head>
 
 <body>
-  <h1>Please select the course to launch the LTI login from</h1>
+  <h1>Course selection</h1>
+  <p>You are logged in as {lti_user["given_name"]} {lti_user["family_name"]}</p>
+  <p><a href="{request.url_for("logout")}">Log out</a></p>
+  <p>Please select the course to launch the LTI login from</p>
   <ul>
     {courses}
   </ul>
@@ -183,6 +195,18 @@ def lti_start_login(
             "lti_provider_mock_redirect", cookie_serializer.dumps(str(request.url_for("lti_start_login", cid=cid)))
         )
         return response
+    lti_user = cookie_serializer.loads(lti_provider_mock_user)
+    if (
+        len(
+            [
+                course
+                for course in settings.courses
+                if course.id == cid and (lti_user["id"] in course.users or len(course.users) == 0)
+            ]
+        )
+        == 0
+    ):
+        raise HTTPException(404)
     login_hint = token_hex(32)
     response = HTMLResponse(f"""<!DOCTYPE html>
 <html lang="en">
